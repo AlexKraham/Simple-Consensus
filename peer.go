@@ -18,6 +18,8 @@ var n int
 var v int
 var curr int
 var values []int
+var sentToAll bool
+var endListener bool
 
 func getPort(offset int) string {
 	port_num := 9000 + (offset * 4)
@@ -39,40 +41,60 @@ func startListener() {
 	// start listening
 	l, err := net.Listen("tcp", "localhost:"+port)
 	if err != nil {
+		fmt.Println("We are in err of the listener")
 		log.Fatal(err)
 	}
 	defer l.Close()
-	fmt.Printf("Listening on port: %s \n", port)
+	wg.Done()
+	// defer fmt.Printf("when does this print\n")
+	// fmt.Printf("Peer #%d - Listening on port: %s \n", i, port)
 
 	for {
+		// fmt.Printf("Waiting for connection \n")
 		conn, err := l.Accept()
 		// defer conn.Close()
+		// defer fmt.Printf("DOes tis print in the for \n")
 		if err != nil {
-			log.Fatal(err)
+			// if endListener == true {
+			// 	fmt.Println("Ending...")
+			// 	return
+			// } else {
+			// 	log.Fatal(err)
+			// }
 		}
 		// fmt.Printf("Port [%s] : Listener accepted a connection.\n", port)
 		// fmt.Println("CURR: " + strconv.Itoa(curr))
 
 		netData, err := bufio.NewReader(conn).ReadString('\n')
 		receivedVal, _ := strconv.Atoi(netData)
-
-		wg.Add(1)
+		curr++
 
 		go func(c net.Conn) {
 			// echo all incoming data
 			// fmt.Println("From process: " + netData)
 			values = append(values, receivedVal)
-			curr++
+			// fmt.Printf("Received value: %d\n", receivedVal)
+
 			if curr == n {
 				min := getMin(values)
 				fmt.Printf("Consensus Value: %d\n", min)
+				// l.Close()
 			}
 			io.Copy(c, c)
 			// shut down the connection.
 			c.Close()
 		}(conn)
 
+		// if curr == n && sentToAll == true {
+		// 	fmt.Printf("We should close server here\n")
+		// 	endListener = true
+		// 	conn.Close()
+		// 	l.Close()
+		// } else {
+		// 	fmt.Printf("Curr: %d\n", curr)
+		// }
 	}
+
 }
 
 // keeps on trying to get connection
@@ -99,6 +121,7 @@ func startDialer() {
 			continue
 		}
 		dial = getConn(j)
+		// fmt.Printf("Peer #%d : Sending value #%d to peer #%d\n", i, v, j)
 		defer dial.Close()
 
 		// send it!
@@ -106,6 +129,12 @@ func startDialer() {
 			log.Fatal(err)
 		}
 	}
+	sentToAll = true
+	wg.Done()
+	// fmt.Printf("End of dialer \n")
+	// if curr == n && sentToAll == true {
+	// 	fmt.Printf("We should end here - end of dilaer and serv \n")
+	// }
 
 	// dial := getConn(0)
 	// defer dial.Close()
@@ -141,6 +170,7 @@ func main() {
 	n = total_processes
 	v = val
 	values = append(values, v)
+	sentToAll = false
 
 	curr = 1
 
@@ -150,4 +180,5 @@ func main() {
 	go startDialer()
 
 	wg.Wait()
+	fmt.Printf("The end\n")
 }
